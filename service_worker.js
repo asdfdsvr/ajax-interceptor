@@ -32,13 +32,15 @@ chrome.tabs.onRemoved.addListener(function (tabId) {
 
 function handleContentSend(tabId, params = null) {
   if (contentLoadedIds.includes(tabId)) {
-    chrome.tabs.sendMessage(tabId, params)
+    chrome.tabs.sendMessage(tabId, params).catch(() => {})
   } else {
     chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
       files: ['content.js']
     }).then(() => {
-      chrome.tabs.sendMessage(tabId, params)
+      chrome.tabs.sendMessage(tabId, params).catch(() => {})
+    }).catch((err) => {
+      console.warn('[Ajax Modifier] executeScript failed:', err)
     })
   }
 }
@@ -84,11 +86,9 @@ chrome.runtime.onMessage.addListener(msg => {
       if (tabs && tabs.length) {
         handleContentSend(tabs[0].id, { ...msg, to: 'content' })
       } else if (msg.hasOwnProperty('iframeScriptLoaded')) {
-        // 收到的传送信息是iframeScriptLoaded，说明是suspend刷新状态，提示需要在页面上刷新（只有在suspend时才会有此类情况）
         console.warn("[Ajax Modifier] To make the Ajax Modifier work, please do not refresh on devtools.")
       } else if (msg.key === "ajaxInterceptor_rules" || msg.key === 'ajaxInterceptor_switchOn') {
-        // 收到的传送信息是修改rules且拿不到tab，说明内容也更新不到page script上，提示需要刷新（只有在分离的devtools时才会有此类情况）
-        chrome.runtime.sendMessage(chrome.runtime.id, {type: 'ajaxInterceptor', to: 'iframe', showFreshTip: true})
+        chrome.runtime.sendMessage(chrome.runtime.id, {type: 'ajaxInterceptor', to: 'iframe', showFreshTip: true}).catch(() => {})
       }
     })
   }
@@ -109,7 +109,7 @@ function setPopup(curPanelPosition = false) {
   // 面板从devtools切换为悬浮，提示需要刷新
   if (lastPanelPosition && !curPanelPosition) {
     chrome.action.setPopup({ popup: 'popupSusFresh.html' })
-  } else {   // 其他情况，判断当前是devtools，则提示打开devtools
+  } else {
     chrome.action.setPopup({ popup: curPanelPosition ? 'popupDev.html' : '' })
   }
   // 面板从悬浮切换为devtools，悬浮面板消失

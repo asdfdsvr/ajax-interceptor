@@ -1,148 +1,526 @@
+// ── CSS 变量：亮色主题 ──────────────────────────────────────────
+:root {
+  --bg-base: #f5f7fa;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #f0f4ff;
+  --bg-panel: #ffffff;
+  --bg-header: #f8fafc;
+  --border-color: #e4e8f0;
+  --border-focus: #4f46e5;
+  --text-primary: #1a1d2e;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-light: #eef2ff;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --badge-bg: #f1f5f9;
+  --badge-border: #cbd5e1;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+}
+
+// ── CSS 变量：暗色主题 ──────────────────────────────────────────
+.dark-mode {
+  --bg-base: #0f1117;
+  --bg-surface: #1a1d2e;
+  --bg-surface-hover: #242840;
+  --bg-panel: #1e2235;
+  --bg-header: #161929;
+  --border-color: #2d3250;
+  --border-focus: #818cf8;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #4b5563;
+  --accent: #818cf8;
+  --accent-hover: #6366f1;
+  --accent-light: #1e2235;
+  --danger: #f87171;
+  --success: #4ade80;
+  --badge-bg: #242840;
+  --badge-border: #374151;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.2);
+}
+
+// ── 整体布局 ───────────────────────────────────────────────────
 #main {
   display: flex;
   justify-content: center;
   overflow: auto;
+  background-color: var(--bg-base);
+  min-height: 100vh;
+  transition: background-color 0.3s ease;
 }
+
 .ajax-modifier-main {
   text-align: center;
-  padding: 20px 13px 60px 13px;
+  padding: 16px 14px 72px;
   width: 100%;
   height: 100%;
   max-width: 800px;
-  background: white;
+  background: var(--bg-base);
+  transition: var(--transition);
 }
+
+// ── 顶栏 ───────────────────────────────────────────────────────
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 14px;
+  transition: var(--transition);
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toolbar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  transition: var(--transition);
+
+  &:hover {
+    color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  svg {
+    font-size: 16px;
+  }
+}
+
+.icon-btn-active {
+  color: var(--accent) !important;
+  background: var(--accent-light) !important;
+}
+
+// ── 刷新提示 ───────────────────────────────────────────────────
+.refresh-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: var(--accent-light);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+// ── 规则区域动画 ────────────────────────────────────────────────
 .setting-body {
   position: relative;
-  transition: all .5s;
-  padding: 15px 0 60px;
+  transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease;
+  padding: 4px 0 60px;
 }
+
 .setting-body-hidden {
-  transform: translateY(calc(-100% + 75px));
+  transform: translateY(calc(-100% + 65px));
+  opacity: 0.3;
+  pointer-events: none;
 }
+
 .collapse {
-  transition: all .6s;
-  margin-bottom: 10px;
+  transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
+  margin-bottom: 8px;
+
+  // antd Collapse 覆盖
+  &.ant-collapse {
+    background: transparent;
+    border: none;
+  }
+
+  .ant-collapse-item {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-md) !important;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    transition: var(--transition);
+    animation: cardIn 0.35s cubic-bezier(0.4,0,0.2,1);
+
+    &:hover {
+      border-color: var(--accent) !important;
+      box-shadow: var(--shadow-md);
+    }
+
+    &.ant-collapse-item-active {
+      border-color: var(--accent) !important;
+    }
+  }
+
+  .ant-collapse-header {
+    background: var(--bg-header) !important;
+    padding: 8px 10px !important;
+    transition: background 0.2s ease;
+    align-items: center !important;
+  }
+
+  .ant-collapse-expand-icon {
+    display: flex !important;
+    align-items: center !important;
+    align-self: center !important;
+    height: 100% !important;
+    padding-inline-end: 8px !important;
+  }
+
+  .ant-collapse-content {
+    background: var(--bg-panel) !important;
+    border-top: 1px solid var(--border-color) !important;
+  }
+
+  .ant-collapse-content-box {
+    padding: 10px 12px 14px !important;
+  }
 }
+
 .collapse-hidden {
-  transform: translateY(-100px);
   opacity: 0;
+  transform: translateY(-12px);
+  pointer-events: none;
 }
-.intercepted-requests {
-  margin-bottom: 6px;
-  margin-top: 7px;
-  text-align: left;
-  font-weight: 500;
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
-.intercepted {
-  text-align: left;
-}
-.intercepted > span {
-  width: 100%;
-  display: inline-block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.url {
-  vertical-align: top;
-}
+
+// ── 面板 header ────────────────────────────────────────────────
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
 }
+
 .button-group {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   flex: none;
-  margin: 0 10px;
+  gap: 6px;
+  margin-left: 8px;
 }
+
+// ── 添加按钮 ───────────────────────────────────────────────────
 .wrapper-btn-add {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   text-align: center;
-  transition: top .2s;
+  transition: top 0.25s cubic-bezier(0.4,0,0.2,1);
 }
+
 .btn-add {
-  transition: transform .5s;
-  transition-delay: .1s;
+  transition: transform 0.4s cubic-bezier(0.4,0,0.2,1) !important;
+  box-shadow: var(--shadow-md) !important;
+
+  &:hover {
+    transform: scale(1.08) !important;
+  }
 }
+
 .btn-add-hidden {
-  transform: rotate(-135deg);
+  transform: rotate(-135deg) scale(0.9) !important;
 }
 
-
-.ant-collapse-item {
-  animation-duration: 0.5s;
-  backface-visibility: visible !important;
-  animation-name: flipInX;
+// ── 拦截请求列表 ───────────────────────────────────────────────
+.intercepted-requests {
+  margin-bottom: 6px;
+  margin-top: 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
-@keyframes flipInX {
-  from {
-    -webkit-transform: perspective(450px) rotate3d(1, 0, 0, 90deg);
-    transform: perspective(450px) rotate3d(1, 0, 0, 90deg);
-    -webkit-animation-timing-function: ease-in;
-    animation-timing-function: ease-in;
-    opacity: 0;
-  }
-
-  40% {
-    -webkit-transform: perspective(450px) rotate3d(1, 0, 0, -20deg);
-    transform: perspective(450px) rotate3d(1, 0, 0, -20deg);
-    -webkit-animation-timing-function: ease-in;
-    animation-timing-function: ease-in;
-  }
-
-  60% {
-    -webkit-transform: perspective(450px) rotate3d(1, 0, 0, 10deg);
-    transform: perspective(450px) rotate3d(1, 0, 0, 10deg);
-    opacity: 1;
-  }
-
-  80% {
-    -webkit-transform: perspective(450px) rotate3d(1, 0, 0, -5deg);
-    transform: perspective(450px) rotate3d(1, 0, 0, -5deg);
-  }
-
-  to {
-    -webkit-transform: perspective(450px);
-    transform: perspective(450px);
-  }
+.intercepted {
+  text-align: left;
 }
 
-.radio-icon {
-  font-size: 14px;
-  margin-left: 4px;
-  cursor: pointer;
+.intercepted > span {
+  width: 100%;
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
+
+.intercepted-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 0;
+}
+
+.url {
+  vertical-align: top;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+// ── 位置图片 Modal ─────────────────────────────────────────────
 .position-image {
   width: 486px;
   height: 365px;
 }
+
 .position-title {
   margin-bottom: 10px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
+
 .image-suspend {
   background-image: url("./images/position_suspend.png");
   background-repeat: no-repeat;
   background-size: contain;
 }
+
 .image-devtools {
   background-image: url("./images/position_devtools.png");
   background-repeat: no-repeat;
   background-size: contain;
 }
 
-.ant-collapse-content > .ant-collapse-content-box {
-  padding: 10px 12px 12px;
+.radio-icon {
+  font-size: 14px;
+  margin-left: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.2s;
+
+  &:hover {
+    color: var(--accent);
+  }
 }
-.ant-dropdown-menu {
-  background-color: #353c47;
-}
-.ant-dropdown-menu-item, .ant-dropdown-menu-submenu-title {
-  color: #ffffff;
+
+// ── antd 组件全局覆盖（跟随主题变量）──────────────────────────
+.ajax-modifier-main, .dark-mode {
+
+  // Switch
+  .ant-switch {
+    background-color: var(--border-color);
+
+    &.ant-switch-checked {
+      background-color: var(--accent);
+    }
+  }
+
+  // Input
+  .ant-input {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: 12px !important;
+
+    &::placeholder {
+      color: var(--text-muted) !important;
+    }
+
+    &:focus, &:hover {
+      border-color: var(--accent) !important;
+      box-shadow: 0 0 0 2px rgba(79,70,229,0.12) !important;
+    }
+  }
+
+  // Select
+  .ant-select:not(.ant-select-disabled):hover .ant-select-selector {
+    border-color: var(--accent) !important;
+  }
+
+  .ant-select-selector {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: 12px !important;
+  }
+
+  .ant-select-arrow {
+    color: var(--text-muted) !important;
+  }
+
+  .ant-select-dropdown {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-md) !important;
+  }
+
+  .ant-select-item {
+    color: var(--text-primary) !important;
+
+    &:hover, &.ant-select-item-option-active {
+      background: var(--accent-light) !important;
+    }
+
+    &.ant-select-item-option-selected {
+      background: var(--accent-light) !important;
+      font-weight: 600;
+    }
+  }
+
+  // Badge
+  .ant-badge-count {
+    background: var(--badge-bg) !important;
+    color: var(--text-secondary) !important;
+    box-shadow: 0 0 0 1px var(--badge-border) !important;
+    font-size: 10px !important;
+  }
+
+  // Modal
+  .ant-modal-content {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-md) !important;
+  }
+
+  .ant-modal-header {
+    background: var(--bg-header) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+  }
+
+  .ant-modal-title {
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+  }
+
+  .ant-modal-close {
+    color: var(--text-muted) !important;
+
+    &:hover {
+      color: var(--text-primary) !important;
+      background: var(--bg-surface-hover) !important;
+    }
+  }
+
+  // Radio
+  .ant-radio-button-wrapper {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+    font-size: 12px !important;
+    height: 28px !important;
+    line-height: 26px !important;
+
+    &:hover {
+      color: var(--accent) !important;
+    }
+
+    &.ant-radio-button-wrapper-checked {
+      background: var(--accent) !important;
+      border-color: var(--accent) !important;
+      color: #fff !important;
+    }
+  }
+
+  // Tooltip
+  .ant-tooltip-inner {
+    background: var(--bg-surface) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+    font-size: 11px !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  // Dropdown
+  .ant-dropdown-menu {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-md) !important;
+  }
+
+  .ant-dropdown-menu-item {
+    color: var(--text-primary) !important;
+
+    &:hover {
+      background: var(--accent-light) !important;
+      color: var(--accent) !important;
+    }
+  }
+
+  // Button
+  .ant-btn-primary {
+    background: var(--accent) !important;
+    border-color: var(--accent) !important;
+
+    &:hover {
+      background: var(--accent-hover) !important;
+      border-color: var(--accent-hover) !important;
+    }
+  }
+
+  .ant-btn-default {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+
+    &:hover {
+      border-color: var(--accent) !important;
+      color: var(--accent) !important;
+    }
+  }
 }

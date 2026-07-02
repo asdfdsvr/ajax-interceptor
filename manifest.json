@@ -19,7 +19,6 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "pageScripts/defaultSettings.js",
         "pageScripts/main.js",
         "iframe/index.html"
       ],
@@ -29,7 +28,6 @@
     }
   ],
   "action": {},
-  "content_security_policy": {},
   "host_permissions": [
     "http://*/",
     "https://*/"

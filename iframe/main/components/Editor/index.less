@@ -1,6 +1,85 @@
 .monaco-editor-container {
   text-align: left;
   position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  transition: border-color 0.2s ease;
+
+  &:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(79,70,229,0.1);
+  }
+}
+
+.monaco-editor-header {
+  height: 36px;
+  padding: 0 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--bg-header);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.2s ease;
+
+  .language-select {
+    width: 100px;
+
+    .ant-select-selector {
+      border: none !important;
+      background: transparent !important;
+      color: var(--text-secondary) !important;
+      font-size: 11px !important;
+      padding: 0 4px !important;
+    }
+
+    .ant-select-arrow {
+      color: var(--text-muted) !important;
+    }
+  }
+
+  .editor-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .border-button {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    background: var(--bg-surface-hover);
+    border-radius: var(--radius-sm);
+    padding: 0 8px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    transition: var(--transition);
+    gap: 4px;
+    white-space: nowrap;
+
+    &:hover {
+      color: var(--accent);
+      background: var(--accent-light);
+      border-color: var(--accent);
+    }
+  }
+
+  .align-icon {
+    font-size: 10px;
+  }
+
+  .down-icon {
+    font-size: 9px;
+    margin-left: 1px;
+  }
+}
+.monaco-editor-container {
+  text-align: left;
+  position: relative;
 }
 
 .monaco-editor-header {

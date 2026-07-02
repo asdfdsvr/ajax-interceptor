@@ -1,9 +1,13 @@
 // 命名空间
+// 优先从 content.js 预注入的初始值读取，避免刷新时的竞态条件（早期请求漏拦截）
+const __init = window.__ajaxInterceptorInit || {}
+delete window.__ajaxInterceptorInit
+
 let ajax_interceptor_qoweifjqon = {
   settings: {
-    ajaxInterceptor_switchOn: false,
-    ajaxInterceptor_always200On: true, // 默认开启，后期可以扩展成设置项
-    ajaxInterceptor_rules: [],
+    ajaxInterceptor_switchOn: !!__init.ajaxInterceptor_switchOn,
+    ajaxInterceptor_always200On: true,
+    ajaxInterceptor_rules: __init.ajaxInterceptor_rules || [],
   },
   // 获取匹配到的规则项
   getMatchedInterface: ({
@@ -37,7 +41,6 @@ let ajax_interceptor_qoweifjqon = {
     const keyValueArr = paramStr.split('&');
     let keyValueObj = {};
     keyValueArr.forEach((item) => {
-      // 保证中间不会把=给忽略掉
       const itemArr = item.replace('=', '〓').split('〓');
       const itemObj = {
         [itemArr[0]]: itemArr[1]
@@ -52,21 +55,57 @@ let ajax_interceptor_qoweifjqon = {
     const host = window.location.host
     const currentUrl = window.location.href
     try {
-      // 如果解析成功，表示输入是完整的URL，不需要处理
       new URL(url)
     } catch (e) {
       if (url.startsWith("./") || url.startsWith("../")) {
-        // 相对路由
         url = new URL(url, currentUrl).href
       } else if (url.startsWith("//")) {
-        // 只缺少协议，补全协议
         url = protocol + url
       } else {
-        // 既没有协议也没有域名，补全域名和协议
         url = protocol + "//" + host + (url.startsWith("/") ? "" : "/") + url
       }
     }
     return url
+  },
+  // 读取 ReadableStream 为字符串
+  readReadableStream: async (readableStream) => {
+    const reader = readableStream.getReader();
+    let chunks = [];
+    let done, value;
+
+    while ({
+        done,
+        value
+      } = await reader.read(), !done) {
+      chunks.push(value);
+    }
+
+    let combined = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
+    let offset = 0;
+    for (let chunk of chunks) {
+      combined.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    const decoder = new TextDecoder();
+    return decoder.decode(combined);
+  },
+  // 从字符串创建 ReadableStream
+  createReadableStream: (text) => {
+    const encoder = new TextEncoder();
+    const encodedText = encoder.encode(text);
+
+    const readableStream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encodedText);
+        controller.close();
+      }
+    });
+
+    return readableStream;
+  },
+  isReadableStream: (obj) => {
+    return obj instanceof ReadableStream
   },
   originalXHR: window.XMLHttpRequest,
   myXHR: function () {
@@ -87,15 +126,12 @@ let ajax_interceptor_qoweifjqon = {
         let overrideStatus = undefined
         let overrideStatusText = undefined
         if (overrideTxt && !isExpert) {
-          // 普通模式，直接替换
           overrideResponse = overrideTxt
-          // 状态用200覆盖
           if (ajax_interceptor_qoweifjqon.settings.ajaxInterceptor_always200On && this.status !== 200) {
             overrideStatus = 200
             overrideStatusText = 'OK'
           }
         } else if (overrideResponseFunc && isExpert) {
-          // 专业模式，用函数替换
           const funcArgs = {
             method,
             payload: {
@@ -107,7 +143,6 @@ let ajax_interceptor_qoweifjqon = {
             orgStatusText: this.statusText
           }
           const res = ajax_interceptor_qoweifjqon.executeStringFunction(overrideResponseFunc, funcArgs, 'response')
-          // 返回是对象才处理
           if (typeof res === 'object' && res !== null) {
             const {
               response: newResponse = undefined,
@@ -121,7 +156,6 @@ let ajax_interceptor_qoweifjqon = {
             console.error(`[Ajax Modifier] ExecuteFunctionError: Please check your return in the response function. See more details in the examples. \n`)
           }
         }
-        // 没有返回不替换
         this.responseText = overrideResponse !== undefined ? overrideResponse : this.responseText
         this.response = overrideResponse !== undefined ? overrideResponse : this.response
         this.status = overrideStatus !== undefined ? overrideStatus : this.status
@@ -143,7 +177,6 @@ let ajax_interceptor_qoweifjqon = {
       if (attr === 'onreadystatechange') {
         xhr.onreadystatechange = (...args) => {
           if (this.readyState === 4) {
-            // 请求成功
             modifyResponse()
           }
           this.onreadystatechange && this.onreadystatechange.apply(this, args)
@@ -152,7 +185,6 @@ let ajax_interceptor_qoweifjqon = {
         continue
       } else if (attr === 'onload') {
         xhr.onload = (...args) => {
-          // 请求成功
           modifyResponse()
           this.onload && this.onload.apply(this, args)
         }
@@ -167,7 +199,6 @@ let ajax_interceptor_qoweifjqon = {
             thisMethod: method
           })
           const matchedInterface = this._matchedInterface
-          // modify request
           if (matchedInterface) {
             const {
               overridePayloadFunc,
@@ -175,11 +206,11 @@ let ajax_interceptor_qoweifjqon = {
             } = matchedInterface
             if (overridePayloadFunc && isExpert && args[0] && args[1] && args[0].toUpperCase() === 'GET') {
               const queryParams = ajax_interceptor_qoweifjqon.getRequestParams(args[1])
-              const data = {
+              const payloadData = {
                 requestUrl: args[1],
                 queryParams
               }
-              args[1] = ajax_interceptor_qoweifjqon.executeStringFunction(overridePayloadFunc, data, 'payload')
+              args[1] = ajax_interceptor_qoweifjqon.executeStringFunction(overridePayloadFunc, payloadData, 'payload')
             }
           }
           xhr.open && xhr.open.apply(xhr, args)
@@ -187,14 +218,13 @@ let ajax_interceptor_qoweifjqon = {
         continue
       } else if (attr === 'setRequestHeader') {
         this.setRequestHeader = (...args) => {
-          // get headers
           this._headerArgs = this._headerArgs ? Object.assign(this._headerArgs, {
             [args[0]]: args[1]
           }) : {
             [args[0]]: args[1]
           };
           const matchedInterface = this._matchedInterface;
-          if (!(matchedInterface && matchedInterface.overrideHeadersFunc && matchedInterface.isExpert)) { // 没有要拦截修改或添加的header
+          if (!(matchedInterface && matchedInterface.overrideHeadersFunc && matchedInterface.isExpert)) {
             xhr.setRequestHeader && xhr.setRequestHeader.apply(xhr, args);
           }
         }
@@ -203,7 +233,6 @@ let ajax_interceptor_qoweifjqon = {
         this.send = (...args) => {
           const matchedInterface = this._matchedInterface
           if (matchedInterface) {
-            // modify headers
             const {
               overrideHeadersFunc,
               overridePayloadFunc,
@@ -215,7 +244,6 @@ let ajax_interceptor_qoweifjqon = {
                 xhr.setRequestHeader && xhr.setRequestHeader.apply(xhr, [key, headers[key]]);
               })
             }
-            // modify not GET payload
             const [method] = this._openArgs
             if (overridePayloadFunc && isExpert && method !== 'GET') {
               args[0] = ajax_interceptor_qoweifjqon.executeStringFunction(overridePayloadFunc, args[0], 'payload');
@@ -230,7 +258,6 @@ let ajax_interceptor_qoweifjqon = {
       if (typeof xhr[attr] === 'function') {
         this[attr] = xhr[attr].bind(xhr)
       } else {
-        // responseText和response不是writeable的，但拦截时需要修改它，所以修改就存储在this[`_${attr}`]上
         if (['responseText', 'response', 'status', 'statusText'].includes(attr)) {
           Object.defineProperty(this, attr, {
             get: () => this[`_${attr}`] == undefined ? xhr[attr] : this[`_${attr}`],
@@ -249,69 +276,6 @@ let ajax_interceptor_qoweifjqon = {
   },
   originalFetch: window.fetch.bind(window),
   myFetch: async function (...args) {
-
-    const getOriginalResponse = async (stream) => {
-      let text = '';
-      const decoder = new TextDecoder('utf-8');
-      const reader = stream.getReader();
-      const processData = (result) => {
-        if (result.done) {
-          return text;
-        }
-        const value = result.value; // Uint8Array
-        text += decoder.decode(value, {
-          stream: true
-        });
-        // 读取下一个文件片段，重复处理步骤
-        return reader.read().then(processData);
-      };
-      return await reader.read().then(processData);
-    }
-
-    async function readReadableStream(readableStream) {
-      const reader = readableStream.getReader();
-      let chunks = [];
-      let done, value;
-
-      while ({
-          done,
-          value
-        } = await reader.read(), !done) {
-        chunks.push(value);
-      }
-
-      // 将所有块合并到一个单独的 Uint8Array 中
-      let combined = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
-      let offset = 0;
-      for (let chunk of chunks) {
-        combined.set(chunk, offset);
-        offset += chunk.length;
-      }
-
-      // 使用 TextDecoder 将 Uint8Array 转换为字符串
-      const decoder = new TextDecoder();
-      return decoder.decode(combined);
-    }
-
-
-    function createReadableStream(text) {
-      const encoder = new TextEncoder();
-      const encodedText = encoder.encode(text);
-
-      const readableStream = new ReadableStream({
-        start(controller) {
-          controller.enqueue(encodedText);
-          controller.close();
-        }
-      });
-
-      return readableStream;
-    }
-
-    const isReadableStream = (obj) => {
-      return obj instanceof ReadableStream
-    }
-
     let [requestUrl, data] = args;
 
     let inputUrl = ''
@@ -320,7 +284,6 @@ let ajax_interceptor_qoweifjqon = {
       inputUrl = requestUrl
     } else if (typeof requestUrl === 'object') {
       inputUrl = requestUrl.url || ''
-      // readbleStream 的时候，data(args[1]存在空的情况)
       if (!data) {
         data = requestUrl
       }
@@ -333,8 +296,8 @@ let ajax_interceptor_qoweifjqon = {
       thisMethod: data && data.method
     })
     if (matchedInterface && args) {
-      if (bodyData && isReadableStream(data.body)) {
-        bodyData = await readReadableStream(bodyData)
+      if (bodyData && ajax_interceptor_qoweifjqon.isReadableStream(data.body)) {
+        bodyData = await ajax_interceptor_qoweifjqon.readReadableStream(bodyData)
       }
       const {
         overrideHeadersFunc,
@@ -342,7 +305,10 @@ let ajax_interceptor_qoweifjqon = {
         isExpert = false
       } = matchedInterface;
       if (overrideHeadersFunc && isExpert && data) {
-        const headers = ajax_interceptor_qoweifjqon.executeStringFunction(overrideHeadersFunc, this._headerArgs, 'headers')
+        // 从 fetch 的 Request/options 中提取 headers
+        const fetchHeaders = data.headers || (requestUrl instanceof Request ? Object.fromEntries(requestUrl.headers.entries()) : {})
+        const headers = ajax_interceptor_qoweifjqon.executeStringFunction(overrideHeadersFunc, fetchHeaders, 'headers')
+        args[1] = args[1] || {}
         args[1].headers = headers
       }
       if (overridePayloadFunc && isExpert && requestUrl && data) {
@@ -351,22 +317,21 @@ let ajax_interceptor_qoweifjqon = {
         } = data
         if (['GET', 'HEAD'].includes(method.toUpperCase())) {
           const queryParams = ajax_interceptor_qoweifjqon.getRequestParams(inputUrl);
-          const data = {
+          const payloadData = {
             requestUrl: inputUrl,
             queryParams
           }
-          args[0] = ajax_interceptor_qoweifjqon.executeStringFunction(overridePayloadFunc, data, 'payload');
+          args[0] = ajax_interceptor_qoweifjqon.executeStringFunction(overridePayloadFunc, payloadData, 'payload');
         } else {
-          const dataer = await ajax_interceptor_qoweifjqon.executeStringFunction(overridePayloadFunc, bodyData, 'payload');
-          if (isReadableStream(data.body)) {
-            const body = createReadableStream(dataer)
-            // const [body1] = dataer.tee()
+          const modifiedBody = await ajax_interceptor_qoweifjqon.executeStringFunction(overridePayloadFunc, bodyData, 'payload');
+          if (ajax_interceptor_qoweifjqon.isReadableStream(data.body)) {
+            const body = ajax_interceptor_qoweifjqon.createReadableStream(modifiedBody)
             args[0] = new Request(args[0], {
               body,
               duplex: 'half'
             });
           } else {
-            data.body = dataer
+            data.body = modifiedBody
           }
         }
       }
@@ -379,8 +344,6 @@ let ajax_interceptor_qoweifjqon = {
             match: matchedInterface.match
           }
         }))
-        let txt = undefined
-        txt = matchedInterface.overrideTxt
         const {
           overrideTxt,
           overrideResponseFunc,
@@ -391,17 +354,14 @@ let ajax_interceptor_qoweifjqon = {
         let overrideStatusText = undefined
 
         if (overrideTxt && !isExpert) {
-          // 普通模式，直接替换
           overrideResponse = overrideTxt
-          // 状态用200覆盖
-          if (ajax_interceptor_qoweifjqon.settings.ajaxInterceptor_always200On && this.status !== 200) {
+          if (ajax_interceptor_qoweifjqon.settings.ajaxInterceptor_always200On && response.status !== 200) {
             overrideStatus = 200
             overrideStatusText = 'OK'
           }
         } else if (overrideResponseFunc && isExpert) {
-          // 专业模式，用函数替换
-          const queryParams = ajax_interceptor_qoweifjqon.getRequestParams(requestUrl)
-          const orgResponse = await getOriginalResponse(response.body);
+          const queryParams = ajax_interceptor_qoweifjqon.getRequestParams(inputUrl)
+          const orgResponse = await ajax_interceptor_qoweifjqon.readReadableStream(response.body);
           const funcArgs = {
             method: data?.method,
             payload: {
@@ -426,18 +386,9 @@ let ajax_interceptor_qoweifjqon = {
             console.error(`[Ajax Modifier] ExecuteFunctionError: Please check your return in the response function. See more details in the examples. \n`)
           }
         }
-        txt = overrideResponse !== undefined ? overrideResponse : response.responseText
-        const stream = new ReadableStream({
-          start(controller) {
-            // const bufView = new Uint8Array(new ArrayBuffer(txt.length))
-            // for (var i = 0 i < txt.length i++) {
-            //   bufView[i] = txt.charCodeAt(i)
-            // }
-            controller.enqueue(new TextEncoder().encode(txt))
-            controller.close()
-          }
-        })
-        let params = {
+        const txt = overrideResponse !== undefined ? overrideResponse : await response.text()
+        const stream = ajax_interceptor_qoweifjqon.createReadableStream(txt)
+        const params = {
           status: overrideStatus !== undefined ? overrideStatus : response.status,
           statusText: overrideStatusText !== undefined ? overrideStatusText : response.statusText,
         }
@@ -479,11 +430,18 @@ window.addEventListener("message", function (event) {
     ajax_interceptor_qoweifjqon.settings[data.key] = data.value
   }
 
+  applyInterceptor()
+}, false)
+
+// 脚本加载时根据初始状态立即挂钩，无需等待消息
+applyInterceptor()
+
+function applyInterceptor() {
   if (ajax_interceptor_qoweifjqon.settings.ajaxInterceptor_switchOn) {
     // https://github.com/YGYOOO/ajax-interceptor/issues/78
     // https://github.com/YGYOOO/ajax-interceptor/issues/93
-    for (const k in ajax_tools_space.originalXHR) {
-      ajax_tools_space.myXHR[k] = ajax_tools_space.originalXHR[k]
+    for (const k in ajax_interceptor_qoweifjqon.originalXHR) {
+      ajax_interceptor_qoweifjqon.myXHR[k] = ajax_interceptor_qoweifjqon.originalXHR[k]
     }
     window.XMLHttpRequest = ajax_interceptor_qoweifjqon.myXHR
     window.fetch = ajax_interceptor_qoweifjqon.myFetch
@@ -491,4 +449,4 @@ window.addEventListener("message", function (event) {
     window.XMLHttpRequest = ajax_interceptor_qoweifjqon.originalXHR
     window.fetch = ajax_interceptor_qoweifjqon.originalFetch
   }
-}, false)
+}

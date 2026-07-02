@@ -1,15 +1,30 @@
 <!DOCTYPE html>
 <html>
+
+<head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <head>
-  </head>
-  <body>
-    <style>
-      #main {
-        height: 100%
-      }
-    </style>
-    <div id="main"></div>
-    <script type="module" src="dist/bundle.js"></script>
-  </body>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+
+    #main {
+      height: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="main"></div>
+  <!-- 异步 chunk（monaco 等）由 webpack runtime 在运行时自动加载 -->
+  <script src="dist/bundle.js"></script>
+</body>
+
 </html>

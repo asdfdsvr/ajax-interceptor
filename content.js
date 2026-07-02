@@ -1,36 +1,30 @@
-// const elt = document.createElement("script")
-// elt.innerHTML = "window.test = 1"
-// document.head.appendChild(elt)
+// 先从 storage 读取设置，再注入拦截脚本
+// 这样 pageScripts/main.js 加载时可以立即读到正确的初始状态，不会漏掉页面早期的请求
+chrome.storage.local.get(['ajaxInterceptor_switchOn', 'ajaxInterceptor_rules', 'customFunction'], (result) => {
 
-// 在页面上插入代码
-// const s1 = document.createElement('script')
-// s1.setAttribute('type', 'text/javascript')
-// s1.setAttribute('src', chrome.runtime.getURL('pageScripts/defaultSettings.js'))
-// document.documentElement.appendChild(s1)
-
-// 在页面上插入代码
-const script = document.createElement('script')
-script.setAttribute('type', 'text/javascript')
-script.setAttribute('src', chrome.runtime.getURL('pageScripts/main.js'))
-document.documentElement.appendChild(script)
-
-script.addEventListener('load', () => {
-  chrome.storage.local.get(['ajaxInterceptor_switchOn', 'ajaxInterceptor_rules'], (result) => {
-    if (result.hasOwnProperty('ajaxInterceptor_switchOn')) {
-      postMessage({type: 'ajaxInterceptor', to: 'pageScript', key: 'ajaxInterceptor_switchOn', value: result.ajaxInterceptor_switchOn})
-    }
-    if (result.ajaxInterceptor_rules) {
-      postMessage({type: 'ajaxInterceptor', to: 'pageScript', key: 'ajaxInterceptor_rules', value: result.ajaxInterceptor_rules})
-    }
-  })
-})
-
-
-let iframe
-let iframeLoaded = false
-let isDevtoolPosition = false
-chrome.storage.local.get(['customFunction'], (result) => {
   isDevtoolPosition = !!result.customFunction?.panelPosition
+
+  // 将初始设置写入页面，供 main.js 直接读取（无需等待异步消息）
+  // 使用 Unicode 转义 <、>、& 防止 </script> 注入攻击
+  const initConfig = {
+    ajaxInterceptor_switchOn: !!result.ajaxInterceptor_switchOn,
+    ajaxInterceptor_rules: result.ajaxInterceptor_rules || [],
+  }
+  const safeJson = JSON.stringify(initConfig)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+  const initScript = document.createElement('script')
+  initScript.textContent = `window.__ajaxInterceptorInit = ${safeJson};`
+  document.documentElement.appendChild(initScript)
+  initScript.remove()
+
+  // 再注入拦截主脚本
+  const script = document.createElement('script')
+  script.setAttribute('type', 'text/javascript')
+  script.setAttribute('src', chrome.runtime.getURL('pageScripts/main.js'))
+  document.documentElement.appendChild(script)
+
   if (!result.customFunction?.panelPosition) {
     if (['complete', 'interactive'].includes(document.readyState)) {
       insertIframe()
@@ -41,13 +35,32 @@ chrome.storage.local.get(['customFunction'], (result) => {
         }
       }
     }
+  } else {
+    // devtools 模式：在确认到 panelPosition 后再通知 iframe/devtools
+    // （必须在回调内执行，此时 isDevtoolPosition 才已正确赋値）
+    chrome.runtime.sendMessage(chrome.runtime.id, {
+      type: 'ajaxInterceptor',
+      to: 'iframe',
+      contentScriptLoaded: true
+    }).catch(() => {})
   }
+})
+
+chrome.runtime.sendMessage(chrome.runtime.id, {type: 'ajaxInterceptor', to: 'background', contentScriptLoaded: true}).catch(() => {})
+
+let iframeLoaded = false
+let isDevtoolPosition = false
+
+// 等待 iframe 加载完成的 Promise
+let iframeReadyResolve
+const iframeReady = new Promise((resolve) => {
+  iframeReadyResolve = resolve
 })
 
 // 只在最顶层页面嵌入iframe
 function insertIframe() {
   if (window.self === window.top) {
-    iframe = document.createElement('iframe')
+    const iframe = document.createElement('iframe')
     iframe.className = "api-interceptor"
     iframe.style.setProperty('height', '100%', 'important')
     iframe.style.setProperty('width', '518px', 'important')
@@ -80,7 +93,10 @@ function insertIframe() {
 chrome.runtime.onMessage.addListener(msg => {
   if (msg.type === 'ajaxInterceptor' && msg.to === 'content') {
     if (msg.hasOwnProperty('iframeScriptLoaded')) {
-      if (msg.iframeScriptLoaded) iframeLoaded = true
+      if (msg.iframeScriptLoaded) {
+        iframeLoaded = true
+        iframeReadyResolve && iframeReadyResolve()
+      }
     } else {
       postMessage({...msg, to: 'pageScript'})
     }
@@ -90,35 +106,18 @@ chrome.runtime.onMessage.addListener(msg => {
 // 接收pageScript传来的信息，转发给iframe
 window.addEventListener("pageScript", function(event) {
   if (iframeLoaded || isDevtoolPosition) {
-    chrome.runtime.sendMessage({type: 'ajaxInterceptor', to: 'iframe', ...event.detail})
+    chrome.runtime.sendMessage({type: 'ajaxInterceptor', to: 'iframe', ...event.detail}).catch(() => {})
   } else {
-    let count = 0
-    const checktLoadedInterval = setInterval(() => {
-      if (iframeLoaded) {
-        clearInterval(checktLoadedInterval)
-        chrome.runtime.sendMessage({type: 'ajaxInterceptor', to: 'iframe', ...event.detail})
-      }
-      if (count ++ > 500) {
-        clearInterval(checktLoadedInterval)
-      }
-    }, 10)
+    // 等待 iframe 加载完成后再发送，超时 5 秒
+    Promise.race([
+      iframeReady,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('iframe load timeout')), 5000))
+    ]).then(() => {
+      chrome.runtime.sendMessage({type: 'ajaxInterceptor', to: 'iframe', ...event.detail}).catch(() => {})
+    }).catch(() => {
+      console.warn('[Ajax Modifier] iframe load timeout, message dropped.')
+    })
   }
 }, false)
 
-// window.addEventListener("message", function(event) {
-// console.log(event.data)
-// }, false)
-
-// window.parent.postMessage({ type: "CONTENT", text: "Hello from the webpage!" }, "*")
-
-
-// var s = document.createElement('script')
-// s.setAttribute('type', 'text/javascript')
-// s.innerText = `console.log('test')`
-// document.documentElement.appendChild(s)
-
-chrome.runtime.sendMessage(chrome.runtime.id, {type: 'ajaxInterceptor', to: 'background', contentScriptLoaded: true})
-
-if (isDevtoolPosition) {
-  chrome.runtime.sendMessage(chrome.runtime.id, {type: 'ajaxInterceptor', to: 'iframe', contentScriptLoaded: true})
-}
+chrome.runtime.sendMessage(chrome.runtime.id, {type: 'ajaxInterceptor', to: 'background', contentScriptLoaded: true}).catch(() => {})

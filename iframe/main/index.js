@@ -1,6 +1,4 @@
-import React from 'react'
-import ReactDOM from 'react-dom'
-
+import { createRoot } from 'react-dom/client'
 import Main from './Main'
 
 const DEFAULT_SETTING = {
@@ -11,29 +9,21 @@ const DEFAULT_SETTING = {
   }
 }
 
+const root = createRoot(document.getElementById('main'))
+
 if (chrome.storage) {
-  chrome.storage.local.get(['ajaxInterceptor_switchOn', 'ajaxInterceptor_rules', 'customFunction'], (result) => {
-    // if (result.ajaxInterceptor_switchOn) {
-    //   this.set('ajaxInterceptor_switchOn', result.ajaxInterceptor_switchOn, false)
-    // }
-    // if (result.ajaxInterceptor_rules) {
-    //   this.set('ajaxInterceptor_rules', result.ajaxInterceptor_rules, false)
-    // }
+  chrome.storage.local.get(['ajaxInterceptor_switchOn', 'ajaxInterceptor_rules', 'customFunction', 'darkMode'], (result) => {
     window.setting = {
       ...DEFAULT_SETTING,
       ...result,
     }
+    // 初始化暗黑模式：优先读 storage，否则跟随系统
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    window.setting.darkMode = result.darkMode !== undefined ? result.darkMode : prefersDark
 
-    ReactDOM.render(
-      <Main/>,
-      document.getElementById('main')
-    )
+    root.render(<Main/>)
   })
 } else {
   window.setting = DEFAULT_SETTING
-  // 测试环境
-  ReactDOM.render(
-    <Main/>,
-    document.getElementById('main')
-  )
+  root.render(<Main/>)
 }
