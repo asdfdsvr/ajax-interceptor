@@ -1,7 +1,8 @@
 // 命名空间
-// 优先从 content.js 预注入的初始值读取，避免刷新时的竞态条件（早期请求漏拦截）
-const __init = window.__ajaxInterceptorInit || {}
-delete window.__ajaxInterceptorInit
+// 从 content.js 预写入的 <meta> 标签读取初始配置，避免刷新时的竞态条件（早期请求漏拦截）
+const __initMeta = document.querySelector('meta[name="__ajaxInterceptorInit"]')
+const __init = __initMeta ? JSON.parse(__initMeta.content) : {}
+if (__initMeta) __initMeta.remove()
 
 let ajax_interceptor_qoweifjqon = {
   settings: {

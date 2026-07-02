@@ -4,20 +4,16 @@ chrome.storage.local.get(['ajaxInterceptor_switchOn', 'ajaxInterceptor_rules', '
 
   isDevtoolPosition = !!result.customFunction?.panelPosition
 
-  // 将初始设置写入页面，供 main.js 直接读取（无需等待异步消息）
-  // 使用 Unicode 转义 <、>、& 防止 </script> 注入攻击
+  // 将初始设置写入隐藏 <meta> 标签，供 main.js 读取
+  // 纯 DOM 操作，不执行任何脚本，不受 CSP 限制
   const initConfig = {
     ajaxInterceptor_switchOn: !!result.ajaxInterceptor_switchOn,
     ajaxInterceptor_rules: result.ajaxInterceptor_rules || [],
   }
-  const safeJson = JSON.stringify(initConfig)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/&/g, '\\u0026')
-  const initScript = document.createElement('script')
-  initScript.textContent = `window.__ajaxInterceptorInit = ${safeJson};`
-  document.documentElement.appendChild(initScript)
-  initScript.remove()
+  const metaEl = document.createElement('meta')
+  metaEl.name = '__ajaxInterceptorInit'
+  metaEl.content = JSON.stringify(initConfig)
+  document.documentElement.appendChild(metaEl)
 
   // 再注入拦截主脚本
   const script = document.createElement('script')

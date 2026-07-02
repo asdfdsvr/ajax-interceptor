@@ -303,7 +303,7 @@ export default function Main() {
                     key={key}
                     header={
                       <div className="panel-header" onClick={e => e.stopPropagation()}>
-                        <Space.Compact style={{ flex: 'auto', display: 'flex' }}>
+                        <div style={{ flex: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
                           <Input
                             placeholder="name"
                             style={{ width: '1px', maxWidth: '110px', flex: 'auto' }}
@@ -337,7 +337,7 @@ export default function Main() {
                             defaultValue={match}
                             onChange={e => handleMatchChange(e, i)}
                           />
-                        </Space.Compact>
+                        </div>
                         <div className="button-group">
                           <Switch
                             size="small"
