@@ -238,10 +238,45 @@
 // ── 面板 header ────────────────────────────────────────────────
 .panel-header {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  flex-direction: column;
   gap: 6px;
   width: 100%;
+}
+
+.panel-header-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.body-filter-row {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.body-filter-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  flex: none;
+  margin-right: 2px;
+}
+
+.mock-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  margin-left: 8px;
+}
+
+.mock-toggle-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-weight: 500;
 }
 
 .button-group {
@@ -255,12 +290,9 @@
 
 // ── 添加按钮 ───────────────────────────────────────────────────
 .wrapper-btn-add {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
   text-align: center;
-  transition: top 0.25s cubic-bezier(0.4,0,0.2,1);
+  width: 100%;
+  margin-top: 12px;
 }
 
 .btn-add {
@@ -523,4 +555,5 @@
       color: var(--accent) !important;
     }
   }
+
 }

@@ -12,7 +12,7 @@ import { setChromeStorage } from '../../utils'
 
 import './index.less'
 
-export default function Replacer({ index, set, updateAddBtnTop_interval, darkMode }) {
+export default function Replacer({ index, set, darkMode }) {
   const [editorValue, setEditorValue] = useState(
     window.setting.ajaxInterceptor_rules[index].editorValue || 3
   )
@@ -30,7 +30,7 @@ export default function Replacer({ index, set, updateAddBtnTop_interval, darkMod
     setIsExpert(newIsExpert)
     window.setting.ajaxInterceptor_rules[index].isExpert = newIsExpert
     setChromeStorage('ajaxInterceptor_rules', window.setting.ajaxInterceptor_rules)
-    updateAddBtnTop_interval()
+    // 按钮已改为正常文档流布局,无需再动态计算 top
   }
 
   const handleEditorRatioChange = e => {

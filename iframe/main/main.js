@@ -28,16 +28,12 @@ export default function Main() {
   const [darkMode, setDarkMode] = useState(window.setting.darkMode || false)
   const [, forceUpdate] = useState(0)
 
-  const collapseWrapperRef = useRef(null)
   const addBtnRef = useRef(null)
-  const collapseWrapperHeight = useRef(-1)
-  const updateAddBtnTopDebounceTimeout = useRef(null)
   const forceUpdateTimeout = useRef(null)
 
   // 统一清理所有 timer，防止组件卸载后的内存泄漏
   useEffect(() => {
     return () => {
-      clearTimeout(updateAddBtnTopDebounceTimeout.current)
       clearTimeout(forceUpdateTimeout.current)
     }
   }, [])
@@ -58,36 +54,12 @@ export default function Main() {
     setDarkMode(prev => !prev)
   }
 
-  const updateAddBtnTop = useCallback(() => {
-    let curHeight = collapseWrapperRef.current ? collapseWrapperRef.current.offsetHeight : 0
-    if (collapseWrapperHeight.current !== curHeight) {
-      collapseWrapperHeight.current = curHeight
-      clearTimeout(updateAddBtnTopDebounceTimeout.current)
-      updateAddBtnTopDebounceTimeout.current = setTimeout(() => {
-        if (addBtnRef.current) {
-          addBtnRef.current.style.top = `${curHeight + 30}px`
-        }
-      }, 50)
-    }
-  }, [])
-
-  const updateAddBtnTop_interval = useCallback(({ timeout = 1000, interval = 50 } = {}) => {
-    const i = setInterval(updateAddBtnTop, interval)
-    setTimeout(() => {
-      clearInterval(i)
-    }, timeout)
-  }, [updateAddBtnTop])
-
   const forceUpdateDebounce = useCallback(() => {
     clearTimeout(forceUpdateTimeout.current)
     forceUpdateTimeout.current = setTimeout(() => {
       forceUpdate(v => v + 1)
     }, 1000)
   }, [])
-
-  useEffect(() => {
-    updateAddBtnTop_interval()
-  }, [updateAddBtnTop_interval])
 
   useEffect(() => {
     const listener = ({ type, to, url, match, contentScriptLoaded = false, showFreshTip = false }) => {
@@ -111,7 +83,6 @@ export default function Main() {
           }
           return newRequests
         })
-        setTimeout(() => updateAddBtnTop_interval(), 100)
       }
     }
     chrome.runtime.onMessage.addListener(listener)
@@ -125,7 +96,7 @@ export default function Main() {
     return () => {
       chrome.runtime.onMessage.removeListener(listener)
     }
-  }, [updateAddBtnTop_interval])
+  }, [])
 
   const set = useCallback((key, value) => {
     chrome.runtime.sendMessage(chrome.runtime.id, { type: 'ajaxInterceptor', to: 'background', key, value }).catch(() => {})
@@ -156,6 +127,18 @@ export default function Main() {
     forceUpdateDebounce()
   }, [set, forceUpdateDebounce])
 
+  const handleBodyFilterChange = useCallback((e, i) => {
+    window.setting.ajaxInterceptor_rules[i].bodyFilter = e.target.value
+    set('ajaxInterceptor_rules', window.setting.ajaxInterceptor_rules)
+    forceUpdateDebounce()
+  }, [set, forceUpdateDebounce])
+
+  const handleDirectReturnChange = useCallback((val, i) => {
+    window.setting.ajaxInterceptor_rules[i].directReturn = val
+    set('ajaxInterceptor_rules', window.setting.ajaxInterceptor_rules)
+    forceUpdate(v => v + 1)
+  }, [set])
+
   const handleLabelChange = useCallback((e, i) => {
     window.setting.ajaxInterceptor_rules[i].label = e.target.value
     set('ajaxInterceptor_rules', window.setting.ajaxInterceptor_rules)
@@ -167,11 +150,12 @@ export default function Main() {
       match: '',
       label: `url${window.setting.ajaxInterceptor_rules.length + 1}`,
       switchOn: true,
-      key: buildUUID()
+      key: buildUUID(),
+      bodyFilter: '',
+      directReturn: false,
     })
     forceUpdate(v => v + 1)
-    setTimeout(() => updateAddBtnTop_interval(), 100)
-  }, [updateAddBtnTop_interval])
+  }, [])
 
   const handleClickRemove = useCallback((e, i) => {
     e.stopPropagation()
@@ -190,12 +174,8 @@ export default function Main() {
       delete next[label]
       return next
     })
-    setTimeout(() => updateAddBtnTop_interval(), 100)
-  }, [set, updateAddBtnTop_interval])
+  }, [set])
 
-  const handleCollapseChange = useCallback(() => {
-    updateAddBtnTop_interval()
-  }, [updateAddBtnTop_interval])
 
   const handleSwitchChange = useCallback(() => {
     window.setting.ajaxInterceptor_switchOn = !window.setting.ajaxInterceptor_switchOn
@@ -286,10 +266,9 @@ export default function Main() {
         {/* 规则列表 */}
         <div className={isOn ? 'setting-body' : 'setting-body setting-body-hidden'}>
           {window.setting.ajaxInterceptor_rules && window.setting.ajaxInterceptor_rules.length > 0 ? (
-            <div ref={collapseWrapperRef}>
+            <div>
               <Collapse
                 className={isOn ? 'collapse' : 'collapse collapse-hidden'}
-                onChange={handleCollapseChange}
               >
                 {window.setting.ajaxInterceptor_rules.map(({
                   filterType = 'normal',
@@ -297,70 +276,90 @@ export default function Main() {
                   match,
                   label,
                   switchOn = true,
-                  key
+                  key,
+                  bodyFilter = '',
+                  directReturn = false,
                 }, i) => (
                   <Panel
                     key={key}
                     header={
                       <div className="panel-header" onClick={e => e.stopPropagation()}>
-                        <div style={{ flex: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                          <Input
-                            placeholder="name"
-                            style={{ width: '1px', maxWidth: '110px', flex: 'auto' }}
-                            defaultValue={label}
-                            onChange={e => handleLabelChange(e, i)}
-                          />
-                          <Select
-                            defaultValue={limitMethod}
-                            style={{ width: '1px', maxWidth: '90px', flex: '1.5 1 auto' }}
-                            onChange={e => handleLimitMethodChange(e, i)}
-                          >
-                            <Select.Option value="ALL">ALL</Select.Option>
-                            <Select.Option value="GET">GET</Select.Option>
-                            <Select.Option value="POST">POST</Select.Option>
-                            <Select.Option value="PUT">PUT</Select.Option>
-                            <Select.Option value="HEAD">HEAD</Select.Option>
-                            <Select.Option value="DELETE">DELETE</Select.Option>
-                            <Select.Option value="OPTIONS">OPTIONS</Select.Option>
-                          </Select>
-                          <Select
-                            defaultValue={filterType}
-                            style={{ width: '1px', maxWidth: '90px', flex: '1.5 1 auto' }}
-                            onChange={e => handleFilterTypeChange(e, i)}
-                          >
-                            <Select.Option value="normal">normal</Select.Option>
-                            <Select.Option value="regex">regex</Select.Option>
-                          </Select>
-                          <Input
-                            placeholder={filterType === 'normal' ? 'eg: abc/get' : 'eg: abc.*'}
-                            style={{ width: '1px', flex: '2 1 auto' }}
-                            defaultValue={match}
-                            onChange={e => handleMatchChange(e, i)}
-                          />
-                        </div>
-                        <div className="button-group">
-                          <Switch
-                            size="small"
-                            defaultChecked={switchOn}
-                            onChange={val => handleSingleSwitchChange(val, i)}
-                          />
-                          <Tooltip title="Remove rule">
-                            <Button
-                              type="primary"
-                              danger
-                              shape="circle"
-                              icon={<MinusOutlined />}
-                              size="small"
-                              onClick={e => handleClickRemove(e, i)}
-                              style={{ width: '22px', height: '22px', minWidth: '22px' }}
+                        <div className="panel-header-row">
+                          <div style={{ flex: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <Input
+                              placeholder="name"
+                              style={{ width: '1px', maxWidth: '110px', flex: 'auto' }}
+                              defaultValue={label}
+                              onChange={e => handleLabelChange(e, i)}
                             />
-                          </Tooltip>
+                            <Select
+                              defaultValue={limitMethod}
+                              style={{ width: '1px', maxWidth: '90px', flex: '1.5 1 auto' }}
+                              onChange={e => handleLimitMethodChange(e, i)}
+                            >
+                              <Select.Option value="ALL">ALL</Select.Option>
+                              <Select.Option value="GET">GET</Select.Option>
+                              <Select.Option value="POST">POST</Select.Option>
+                              <Select.Option value="PUT">PUT</Select.Option>
+                              <Select.Option value="HEAD">HEAD</Select.Option>
+                              <Select.Option value="DELETE">DELETE</Select.Option>
+                              <Select.Option value="OPTIONS">OPTIONS</Select.Option>
+                            </Select>
+                            <Select
+                              defaultValue={filterType}
+                              style={{ width: '1px', maxWidth: '90px', flex: '1.5 1 auto' }}
+                              onChange={e => handleFilterTypeChange(e, i)}
+                            >
+                              <Select.Option value="normal">normal</Select.Option>
+                              <Select.Option value="regex">regex</Select.Option>
+                            </Select>
+                            <Input
+                              placeholder={filterType === 'normal' ? 'eg: abc/get' : 'eg: abc.*'}
+                              style={{ width: '1px', flex: '2 1 auto' }}
+                              defaultValue={match}
+                              onChange={e => handleMatchChange(e, i)}
+                            />
+                          </div>
+                          <div className="button-group">
+                            <Switch
+                              size="small"
+                              defaultChecked={switchOn}
+                              onChange={val => handleSingleSwitchChange(val, i)}
+                            />
+                            <Tooltip title="Remove rule">
+                              <Button
+                                type="primary"
+                                danger
+                                shape="circle"
+                                icon={<MinusOutlined />}
+                                size="small"
+                                onClick={e => handleClickRemove(e, i)}
+                                style={{ width: '22px', height: '22px', minWidth: '22px' }}
+                              />
+                            </Tooltip>
+                          </div>
+                        </div>
+                        <div className="panel-header-row body-filter-row">
+                          <span className="body-filter-label">Body:</span>
+                          <Input
+                            placeholder="Filter by params, eg: id=123 or userId ="
+                            style={{ flex: 'auto' }}
+                            defaultValue={bodyFilter}
+                            onChange={e => handleBodyFilterChange(e, i)}
+                          />
+                          <div className="mock-toggle">
+                            <Switch
+                              size="small"
+                              defaultChecked={directReturn}
+                              onChange={val => handleDirectReturnChange(val, i)}
+                            />
+                            <span className="mock-toggle-label">Mock</span>
+                          </div>
                         </div>
                       </div>
                     }
                   >
                     <Replacer
-                      updateAddBtnTop_interval={updateAddBtnTop_interval}
                       index={i}
                       set={set}
                       darkMode={darkMode}
