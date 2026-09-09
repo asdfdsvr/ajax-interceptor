@@ -1,25 +1,61 @@
-// 先从 storage 读取设置，再注入拦截脚本
-// 这样 pageScripts/main.js 加载时可以立即读到正确的初始状态，不会漏掉页面早期的请求
+(function() {
+  // 防止 content script 重复执行
+  if (window.__ajaxInterceptor_contentLoaded) return;
+  window.__ajaxInterceptor_contentLoaded = true;
+
+// 立即注入拦截脚本，不等 storage 回调
+// 确保 pageScripts/main.js 在页面脚本执行前就位，不遗漏早期请求
+const defaultConfig = {
+  ajaxInterceptor_switchOn: true,
+  ajaxInterceptor_rules: [],
+}
+const metaEl = document.createElement('meta')
+metaEl.name = '__ajaxInterceptorInit'
+metaEl.content = JSON.stringify(defaultConfig)
+document.documentElement.appendChild(metaEl)
+
+// 同步加载 main.js 并注入到页面上下文，确保在页面脚本执行前完成拦截挂钩
+let script
+try {
+  const xhr = new XMLHttpRequest()
+  xhr.open('GET', chrome.runtime.getURL('pageScripts/main.js'), false)
+  xhr.send()
+  script = document.createElement('script')
+  script.textContent = xhr.responseText
+} catch (e) {
+  // 同步加载失败，回退到异步 script 标签
+  console.warn('[Ajax Modifier] 同步加载 main.js 失败，回退到异步方式:', e)
+  script = document.createElement('script')
+  script.src = chrome.runtime.getURL('pageScripts/main.js')
+  script.async = false
+}
+document.documentElement.appendChild(script)
+
+// 再从 storage 读取真实设置，通过 postMessage 更新 main.js
 chrome.storage.local.get(['ajaxInterceptor_switchOn', 'ajaxInterceptor_rules', 'customFunction'], (result) => {
 
   isDevtoolPosition = !!result.customFunction?.panelPosition
 
-  // 将初始设置写入隐藏 <meta> 标签，供 main.js 读取
-  // 纯 DOM 操作，不执行任何脚本，不受 CSP 限制
-  const initConfig = {
+  // 更新 meta 标签（供可能延迟加载的代码读取）
+  const realConfig = {
     ajaxInterceptor_switchOn: !!result.ajaxInterceptor_switchOn,
     ajaxInterceptor_rules: result.ajaxInterceptor_rules || [],
   }
-  const metaEl = document.createElement('meta')
-  metaEl.name = '__ajaxInterceptorInit'
-  metaEl.content = JSON.stringify(initConfig)
-  document.documentElement.appendChild(metaEl)
+  metaEl.content = JSON.stringify(realConfig)
 
-  // 再注入拦截主脚本
-  const script = document.createElement('script')
-  script.setAttribute('type', 'text/javascript')
-  script.setAttribute('src', chrome.runtime.getURL('pageScripts/main.js'))
-  document.documentElement.appendChild(script)
+  // 通过 postMessage 通知 main.js 更新设置
+  postMessage({
+    type: 'ajaxInterceptor',
+    to: 'pageScript',
+    key: 'ajaxInterceptor_switchOn',
+    value: !!result.ajaxInterceptor_switchOn
+  }, '*')
+  postMessage({
+    type: 'ajaxInterceptor',
+    to: 'pageScript',
+    key: 'ajaxInterceptor_rules',
+    value: result.ajaxInterceptor_rules || []
+  }, '*')
 
   if (!result.customFunction?.panelPosition) {
     if (['complete', 'interactive'].includes(document.readyState)) {
@@ -71,6 +107,7 @@ function insertIframe() {
     iframe.style.setProperty('transition', 'all .4s', 'important')
     iframe.style.setProperty('box-shadow', '0 0 15px 2px rgba(0,0,0,0.12)', 'important')
     iframe.frameBorder = "none"
+    iframe.allow = "clipboard-write"
     iframe.src = chrome.runtime.getURL("iframe/index.html")
     document.body.appendChild(iframe)
     let show = false
@@ -117,3 +154,4 @@ window.addEventListener("pageScript", function(event) {
 }, false)
 
 chrome.runtime.sendMessage(chrome.runtime.id, {type: 'ajaxInterceptor', to: 'background', contentScriptLoaded: true}).catch(() => {})
+})();

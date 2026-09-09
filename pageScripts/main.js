@@ -1,3 +1,8 @@
+(function() {
+  // 防止重复执行（页面注入多个副本时）
+  if (window.__ajaxInterceptor_mainLoaded) return;
+  window.__ajaxInterceptor_mainLoaded = true;
+
 // 命名空间
 // 从 content.js 预写入的 <meta> 标签读取初始配置，避免刷新时的竞态条件（早期请求漏拦截）
 const __initMeta = document.querySelector('meta[name="__ajaxInterceptorInit"]')
@@ -604,3 +609,4 @@ function applyInterceptor() {
     window.fetch = ajax_interceptor_qoweifjqon.originalFetch
   }
 }
+})();
